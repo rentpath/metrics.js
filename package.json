@@ -1,6 +1,6 @@
 {
     "name": "metrics",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "description": "A cli tool to retrieve performance metrics from a control url and compare it to a target url.",
     "main": "metrics.js",
     "scripts": {
