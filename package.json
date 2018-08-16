@@ -2,10 +2,14 @@
     "name": "metrics",
     "version": "1.2.0",
     "description": "A cli tool to retrieve performance metrics from a control url and compare it to a target url.",
+    "pkg": {
+        "assets": "collectMetrics.js"
+    },
     "main": "metrics.js",
+    "bin": "./metrics",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "buildalpine": "pkg metrics --target \"host\" --output \"metrics-alpine\""
+        "buildalpine": "pkg package.json --target \"host\" --output \"metrics-alpine\""
     },
     "author": "",
     "license": "MIT",
