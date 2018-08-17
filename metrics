@@ -7,7 +7,7 @@ const table = require('markdown-table');
 const server = require('./lib/serverMetrics');
 
 metrics
-    .version('1.6.0')
+    .version('1.7.0')
     .option('-m, --mobile', 'Use mobile user agent')
     .option('--psi', 'Run Page Speed Insights')
     .option('--psi-key [psiKey]', 'Page Speed Insights API key')
@@ -60,6 +60,21 @@ function computeDelta(control, pr) {
     return delta;
 }
 
+const greenSquare = '![#c5f015](https://placehold.it/15/c5f015/000000?text=+)'
+const yellowSquare = '[#fff66](https://placehold.it/15/fff66/000000?text=+)'
+const redSquare = '![#f03c15](https://placehold.it/15/f03c15/000000?text=+)'
+
+function prependColor(delta) {
+    if (delta == 0) {
+        return yellowSquare + ' ' + delta;
+    } else if (delta < 0) {
+        // Negative delta is positive result e.g. we made it faster or smaller
+        return greenSquare + ' ' + delta;
+    } else {
+        return redSquare + ' ' + delta;
+    }
+}
+
 async function doIt(controlUrl, prUrl) {
     let control = await gatherMetrics(controlUrl);
     let pr = await gatherMetrics(prUrl);
@@ -72,32 +87,32 @@ async function doIt(controlUrl, prUrl) {
 
     let metricsTable = [['Metric', 'Control', 'PR', 'Delta'],
                         ['Client Side', '', '', ''],
-                        ['DOM Content Loaded (ms)', control.pageMetrics.dcl, pr.pageMetrics.dcl, delta.pageMetrics.dcl],
-                        ['Interactive (ms)', control.pageMetrics.interactive, pr.pageMetrics.interactive, delta.pageMetrics.interactive],
-                        ['DOM Complete (ms)', control.pageMetrics.domComplete, pr.pageMetrics.domComplete, delta.pageMetrics.domComplete],
-                        ['Load (ms)', control.pageMetrics.load, pr.pageMetrics.load, delta.pageMetrics.load],
-                        ['Paint (ms)', control.pageMetrics.paint, pr.pageMetrics.paint, delta.pageMetrics.paint],
-                        ['DOM Nodes', control.pageMetrics.nodeCount, pr.pageMetrics.nodeCount, delta.pageMetrics.nodeCount],
+                        ['DOM Content Loaded (ms)', control.pageMetrics.dcl, pr.pageMetrics.dcl, prependColor(delta.pageMetrics.dcl)],
+                        ['Interactive (ms)', control.pageMetrics.interactive, pr.pageMetrics.interactive, prependColor(delta.pageMetrics.interactive)],
+                          ['DOM Complete (ms)', control.pageMetrics.domComplete, pr.pageMetrics.domComplete, prependColor(delta.pageMetrics.domComplete)],
+                          ['Load (ms)', control.pageMetrics.load, pr.pageMetrics.load, prependColor(delta.pageMetrics.load)],
+                          ['Paint (ms)', control.pageMetrics.paint, pr.pageMetrics.paint, prependColor(delta.pageMetrics.paint)],
+                          ['DOM Nodes', control.pageMetrics.nodeCount, pr.pageMetrics.nodeCount, prependColor(delta.pageMetrics.nodeCount)],
                         ['Server Side', '', '', ''],
-                        ['DOM Nodes', control.nodeCountServer, pr.nodeCountServer, delta.nodeCountServer],
-                        ['Document Length (bytes)', control.documentLength, pr.documentLength, delta.documentLength]];
+                          ['DOM Nodes', control.nodeCountServer, pr.nodeCountServer, prependColor(delta.nodeCountServer)],
+                          ['Document Length (bytes)', control.documentLength, pr.documentLength, prependColor(delta.documentLength)]];
 
     let psiMetricsTable;
 
     if (metrics.psi) {
         psiMetricsTable = [['Page Speed Insights', '', '', ''],
-                           ['PSI Score (0/100)', control.psiScore, pr.psiScore, delta.psiScore],
-                           ['Number of Hosts', control.psiPageStats.numberHosts, pr.psiPageStats.numberHosts, delta.psiPageStats.numberHosts],
-                           ['Number of Resources', control.psiPageStats.numberResources, pr.psiPageStats.numberResources, delta.psiPageStats.numberResources],
-                           ['Number of Static Resources', control.psiPageStats.numberStaticResources, pr.psiPageStats.numberStaticResources, delta.psiPageStats.numberStaticResources],
-                           ['Total Request Bytes', control.psiPageStats.totalRequestBytes, pr.psiPageStats.totalRequestBytes, delta.psiPageStats.totalRequestBytes],
-                           ['HTML Response Bytes', control.psiPageStats.htmlResponseBytes, pr.psiPageStats.htmlResponseBytes, delta.psiPageStats.htmlResponseBytes],
-                           ['CSS Response Bytes', control.psiPageStats.cssResponseBytes, pr.psiPageStats.cssResponseBytes, delta.psiPageStats.cssResponseBytes],
-                           ['JS Response Bytes', control.psiPageStats.javascriptResponseBytes, pr.psiPageStats.javascriptResponseBytes, delta.psiPageStats.javascriptResponseBytes],
-                           ['Image Response Bytes', control.psiPageStats.imageResponseBytes, pr.psiPageStats.imageResponseBytes, delta.psiPageStats.imageResponseBytes],
-                           ['Other Response Bytes', control.psiPageStats.otherResponseBytes, pr.psiPageStats.otherResponseBytes, delta.psiPageStats.otherResponseBytes],
-                           ['Number JS Resources', control.psiPageStats.numberJsResources, pr.psiPageStats.numberJsResources, delta.psiPageStats.numberJsResources],
-                           ['Number CSS Resources', control.psiPageStats.numberCssResources, pr.psiPageStats.numberCssResources, delta.psiPageStats.numberCssResources]]
+                           ['PSI Score (0/100)', control.psiScore, pr.psiScore, prependColor(delta.psiScore)],
+                            ['Number of Hosts', control.psiPageStats.numberHosts, pr.psiPageStats.numberHosts, prependColor(delta.psiPageStats.numberHosts)],
+                            ['Number of Resources', control.psiPageStats.numberResources, pr.psiPageStats.numberResources, prependColor(delta.psiPageStats.numberResources)],
+                            ['Number of Static Resources', control.psiPageStats.numberStaticResources, pr.psiPageStats.numberStaticResources, prependColor(delta.psiPageStats.numberStaticResources)],
+                            ['Total Request Bytes', control.psiPageStats.totalRequestBytes, pr.psiPageStats.totalRequestBytes, prependColor(delta.psiPageStats.totalRequestBytes)],
+                            ['HTML Response Bytes', control.psiPageStats.htmlResponseBytes, pr.psiPageStats.htmlResponseBytes, prependColor(delta.psiPageStats.htmlResponseBytes)],
+                            ['CSS Response Bytes', control.psiPageStats.cssResponseBytes, pr.psiPageStats.cssResponseBytes, prependColor(delta.psiPageStats.cssResponseBytes)],
+                            ['JS Response Bytes', control.psiPageStats.javascriptResponseBytes, pr.psiPageStats.javascriptResponseBytes, prependColor(delta.psiPageStats.javascriptResponseBytes)],
+                            ['Image Response Bytes', control.psiPageStats.imageResponseBytes, pr.psiPageStats.imageResponseBytes, prependColor(delta.psiPageStats.imageResponseBytes)],
+                            ['Other Response Bytes', control.psiPageStats.otherResponseBytes, pr.psiPageStats.otherResponseBytes, prependColor(delta.psiPageStats.otherResponseBytes)],
+                            ['Number JS Resources', control.psiPageStats.numberJsResources, pr.psiPageStats.numberJsResources, prependColor(delta.psiPageStats.numberJsResources)],
+                            ['Number CSS Resources', control.psiPageStats.numberCssResources, pr.psiPageStats.numberCssResources, prependColor(delta.psiPageStats.numberCssResources)]]
     }
 
     let resultsTable = table([].concat.apply([], [metricsTable, psiMetricsTable]).filter(x => x));
