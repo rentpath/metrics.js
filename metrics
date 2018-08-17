@@ -7,12 +7,12 @@ const table = require('markdown-table');
 const server = require('./lib/serverMetrics');
 
 metrics
-    .version('1.5.0')
+    .version('1.6.0')
     .option('-m, --mobile', 'Use mobile user agent')
     .option('--psi', 'Run Page Speed Insights')
     .option('--psi-key [psiKey]', 'Page Speed Insights API key')
     .option('--control [control]', 'Specify the URL to be used as the control to compare against')
-    .option('--target [target]', 'Specify the URL to be used as the target of the comparison')
+    .option('--pr [pr]', 'Specify the URL to be used to compare the control to')
     .parse(process.argv);
 
 if (!process.argv.slice(2).length) {
@@ -50,62 +50,62 @@ async function gatherMetrics(url) {
     };
 }
 
-function computeDelta(control, target) {
+function computeDelta(control, pr) {
     let delta = {};
 
     for (let k in control) {
-        delta[k] = target[k] - control[k];
+        delta[k] = pr[k] - control[k];
     }
 
     return delta;
 }
 
-async function doIt(controlUrl, targetUrl) {
+async function doIt(controlUrl, prUrl) {
     let control = await gatherMetrics(controlUrl);
-    let target = await gatherMetrics(targetUrl);
+    let pr = await gatherMetrics(prUrl);
 
-    let delta = {pageMetrics: computeDelta(control.pageMetrics, target.pageMetrics),
-                 psiScore: control.psiScore - target.psiScore,
-                 nodeCountServer: control.nodeCountServer - target.nodeCountServer,
-                 documentLength: control.documentLength - target.documentLength,
-                 psiPageStats: computeDelta(control.psiPageStats, target.psiPageStats)};
+    let delta = {pageMetrics: computeDelta(control.pageMetrics, pr.pageMetrics),
+                 psiScore: control.psiScore - pr.psiScore,
+                 nodeCountServer: control.nodeCountServer - pr.nodeCountServer,
+                 documentLength: control.documentLength - pr.documentLength,
+                 psiPageStats: computeDelta(control.psiPageStats, pr.psiPageStats)};
 
-    let metricsTable = [['Metric', 'Control', 'Target', 'Delta'],
+    let metricsTable = [['Metric', 'Control', 'PR', 'Delta'],
                         ['Client Side', '', '', ''],
-                        ['DOM Content Loaded (ms)', control.pageMetrics.dcl, target.pageMetrics.dcl, delta.pageMetrics.dcl],
-                        ['Interactive (ms)', control.pageMetrics.interactive, target.pageMetrics.interactive, delta.pageMetrics.interactive],
-                        ['DOM Complete (ms)', control.pageMetrics.domComplete, target.pageMetrics.domComplete, delta.pageMetrics.domComplete],
-                        ['Load (ms)', control.pageMetrics.load, target.pageMetrics.load, delta.pageMetrics.load],
-                        ['Paint (ms)', control.pageMetrics.paint, target.pageMetrics.paint, delta.pageMetrics.paint],
-                        ['DOM Nodes', control.pageMetrics.nodeCount, target.pageMetrics.nodeCount, delta.pageMetrics.nodeCount],
+                        ['DOM Content Loaded (ms)', control.pageMetrics.dcl, pr.pageMetrics.dcl, delta.pageMetrics.dcl],
+                        ['Interactive (ms)', control.pageMetrics.interactive, pr.pageMetrics.interactive, delta.pageMetrics.interactive],
+                        ['DOM Complete (ms)', control.pageMetrics.domComplete, pr.pageMetrics.domComplete, delta.pageMetrics.domComplete],
+                        ['Load (ms)', control.pageMetrics.load, pr.pageMetrics.load, delta.pageMetrics.load],
+                        ['Paint (ms)', control.pageMetrics.paint, pr.pageMetrics.paint, delta.pageMetrics.paint],
+                        ['DOM Nodes', control.pageMetrics.nodeCount, pr.pageMetrics.nodeCount, delta.pageMetrics.nodeCount],
                         ['Server Side', '', '', ''],
-                        ['DOM Nodes', control.nodeCountServer, target.nodeCountServer, delta.nodeCountServer],
-                        ['Document Length (bytes)', control.documentLength, target.documentLength, delta.documentLength]];
+                        ['DOM Nodes', control.nodeCountServer, pr.nodeCountServer, delta.nodeCountServer],
+                        ['Document Length (bytes)', control.documentLength, pr.documentLength, delta.documentLength]];
 
     let psiMetricsTable;
 
     if (metrics.psi) {
         psiMetricsTable = [['Page Speed Insights', '', '', ''],
-                           ['PSI Score (0/100)', control.psiScore, target.psiScore, delta.psiScore],
-                           ['Number of Hosts', control.psiPageStats.numberHosts, target.psiPageStats.numberHosts, delta.psiPageStats.numberHosts],
-                           ['Number of Resources', control.psiPageStats.numberResources, target.psiPageStats.numberResources, delta.psiPageStats.numberResources],
-                           ['Number of Static Resources', control.psiPageStats.numberStaticResources, target.psiPageStats.numberStaticResources, delta.psiPageStats.numberStaticResources],
-                           ['Total Request Bytes', control.psiPageStats.totalRequestBytes, target.psiPageStats.totalRequestBytes, delta.psiPageStats.totalRequestBytes],
-                           ['HTML Response Bytes', control.psiPageStats.htmlResponseBytes, target.psiPageStats.htmlResponseBytes, delta.psiPageStats.htmlResponseBytes],
-                           ['CSS Response Bytes', control.psiPageStats.cssResponseBytes, target.psiPageStats.cssResponseBytes, delta.psiPageStats.cssResponseBytes],
-                           ['JS Response Bytes', control.psiPageStats.javascriptResponseBytes, target.psiPageStats.javascriptResponseBytes, delta.psiPageStats.javascriptResponseBytes],
-                           ['Image Response Bytes', control.psiPageStats.imageResponseBytes, target.psiPageStats.imageResponseBytes, delta.psiPageStats.imageResponseBytes],
-                           ['Other Response Bytes', control.psiPageStats.otherResponseBytes, target.psiPageStats.otherResponseBytes, delta.psiPageStats.otherResponseBytes],
-                           ['Number JS Resources', control.psiPageStats.numberJsResources, target.psiPageStats.numberJsResources, delta.psiPageStats.numberJsResources],
-                           ['Number CSS Resources', control.psiPageStats.numberCssResources, target.psiPageStats.numberCssResources, delta.psiPageStats.numberCssResources]]
+                           ['PSI Score (0/100)', control.psiScore, pr.psiScore, delta.psiScore],
+                           ['Number of Hosts', control.psiPageStats.numberHosts, pr.psiPageStats.numberHosts, delta.psiPageStats.numberHosts],
+                           ['Number of Resources', control.psiPageStats.numberResources, pr.psiPageStats.numberResources, delta.psiPageStats.numberResources],
+                           ['Number of Static Resources', control.psiPageStats.numberStaticResources, pr.psiPageStats.numberStaticResources, delta.psiPageStats.numberStaticResources],
+                           ['Total Request Bytes', control.psiPageStats.totalRequestBytes, pr.psiPageStats.totalRequestBytes, delta.psiPageStats.totalRequestBytes],
+                           ['HTML Response Bytes', control.psiPageStats.htmlResponseBytes, pr.psiPageStats.htmlResponseBytes, delta.psiPageStats.htmlResponseBytes],
+                           ['CSS Response Bytes', control.psiPageStats.cssResponseBytes, pr.psiPageStats.cssResponseBytes, delta.psiPageStats.cssResponseBytes],
+                           ['JS Response Bytes', control.psiPageStats.javascriptResponseBytes, pr.psiPageStats.javascriptResponseBytes, delta.psiPageStats.javascriptResponseBytes],
+                           ['Image Response Bytes', control.psiPageStats.imageResponseBytes, pr.psiPageStats.imageResponseBytes, delta.psiPageStats.imageResponseBytes],
+                           ['Other Response Bytes', control.psiPageStats.otherResponseBytes, pr.psiPageStats.otherResponseBytes, delta.psiPageStats.otherResponseBytes],
+                           ['Number JS Resources', control.psiPageStats.numberJsResources, pr.psiPageStats.numberJsResources, delta.psiPageStats.numberJsResources],
+                           ['Number CSS Resources', control.psiPageStats.numberCssResources, pr.psiPageStats.numberCssResources, delta.psiPageStats.numberCssResources]]
     }
 
     let resultsTable = table([].concat.apply([], [metricsTable, psiMetricsTable]).filter(x => x));
     const platform = metrics.mobile ? 'Mobile' : 'Desktop';
 
-    console.log('Results of ' + controlUrl + ' vs. ' + targetUrl + ' on ' + platform);
+    console.log('Results of ' + controlUrl + ' vs. ' + prUrl + ' on ' + platform);
     console.log();
     console.log(resultsTable);
 }
 
-doIt(metrics.control, metrics.target);
+doIt(metrics.control, metrics.pr);
