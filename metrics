@@ -4,9 +4,10 @@ const metrics = require('commander');
 const client = require('./lib/client_metrics');
 const psi = require('./lib/psi');
 const table = require('markdown-table');
+const server = require('./lib/serverMetrics');
 
 metrics
-    .version('1.4.0')
+    .version('1.5.0')
     .option('-m, --mobile', 'Use mobile user agent')
     .option('--psi', 'Run Page Speed Insights')
     .option('--psi-key [psiKey]', 'Page Speed Insights API key')
@@ -22,6 +23,8 @@ async function gatherMetrics(url) {
     const options = {isMobile: metrics.mobile,
                      key: metrics.psiKey};
     const clientMetrics = await client.collect(url, options);
+    const pageMetrics = clientMetrics.page;
+    const serverMetrics = await server.collect(url, metrics.mobile);
 
     const psiData = {};
     const psiScore = {};
@@ -39,9 +42,11 @@ async function gatherMetrics(url) {
     }
 
     return {
-        clientMetrics: clientMetrics,
+        pageMetrics: pageMetrics,
         psiScore: psiScore,
-        psiPageStats: psiPageStats
+        psiPageStats: psiPageStats,
+        nodeCountServer: serverMetrics.nodeCount,
+        documentLength: serverMetrics.length
     };
 }
 
@@ -59,19 +64,23 @@ async function doIt(controlUrl, targetUrl) {
     let control = await gatherMetrics(controlUrl);
     let target = await gatherMetrics(targetUrl);
 
-    let delta = {clientMetrics: computeDelta(control.clientMetrics, target.clientMetrics),
+    let delta = {pageMetrics: computeDelta(control.pageMetrics, target.pageMetrics),
                  psiScore: control.psiScore - target.psiScore,
+                 nodeCountServer: control.nodeCountServer - target.nodeCountServer,
+                 documentLength: control.documentLength - target.documentLength,
                  psiPageStats: computeDelta(control.psiPageStats, target.psiPageStats)};
 
-    const tableHeader = [['Metric', 'Control', 'Target', 'Delta']];
-
-    let clientMetricsTable = [['Client Side', '', '', ''],
-                              ['DOM Content Loaded (ms)', control.clientMetrics.dcl, target.clientMetrics.dcl, delta.clientMetrics.dcl],
-                              ['Interactive (ms)', control.clientMetrics.interactive, target.clientMetrics.interactive, delta.clientMetrics.interactive],
-                              ['DOM Complete (ms)', control.clientMetrics.domComplete, target.clientMetrics.domComplete, delta.clientMetrics.domComplete],
-                              ['Load (ms)', control.clientMetrics.load, target.clientMetrics.load, delta.clientMetrics.load],
-                              ['Paint (ms)', control.clientMetrics.paint, target.clientMetrics.paint, delta.clientMetrics.paint],
-                              ['DOM Nodes ', control.clientMetrics.nodeCount, target.clientMetrics.nodeCount, delta.clientMetrics.nodeCount]]
+    let metricsTable = [['Metric', 'Control', 'Target', 'Delta'],
+                        ['Client Side', '', '', ''],
+                        ['DOM Content Loaded (ms)', control.pageMetrics.dcl, target.pageMetrics.dcl, delta.pageMetrics.dcl],
+                        ['Interactive (ms)', control.pageMetrics.interactive, target.pageMetrics.interactive, delta.pageMetrics.interactive],
+                        ['DOM Complete (ms)', control.pageMetrics.domComplete, target.pageMetrics.domComplete, delta.pageMetrics.domComplete],
+                        ['Load (ms)', control.pageMetrics.load, target.pageMetrics.load, delta.pageMetrics.load],
+                        ['Paint (ms)', control.pageMetrics.paint, target.pageMetrics.paint, delta.pageMetrics.paint],
+                        ['DOM Nodes', control.pageMetrics.nodeCount, target.pageMetrics.nodeCount, delta.pageMetrics.nodeCount],
+                        ['Server Side', '', '', ''],
+                        ['DOM Nodes', control.nodeCountServer, target.nodeCountServer, delta.nodeCountServer],
+                        ['Document Length (bytes)', control.documentLength, target.documentLength, delta.documentLength]];
 
     let psiMetricsTable;
 
@@ -91,7 +100,7 @@ async function doIt(controlUrl, targetUrl) {
                            ['Number CSS Resources', control.psiPageStats.numberCssResources, target.psiPageStats.numberCssResources, delta.psiPageStats.numberCssResources]]
     }
 
-    let resultsTable = table([].concat.apply([], [tableHeader, clientMetricsTable, psiMetricsTable]).filter(x => x));
+    let resultsTable = table([].concat.apply([], [metricsTable, psiMetricsTable]).filter(x => x));
     const platform = metrics.mobile ? 'Mobile' : 'Desktop';
 
     console.log('Results of ' + controlUrl + ' vs. ' + targetUrl + ' on ' + platform);
