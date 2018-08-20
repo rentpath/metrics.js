@@ -80,9 +80,9 @@ async function doIt(controlUrl, prUrl) {
     let pr = await gatherMetrics(prUrl);
 
     let delta = {pageMetrics: computeDelta(control.pageMetrics, pr.pageMetrics),
-                 psiScore: control.psiScore - pr.psiScore,
-                 nodeCountServer: control.nodeCountServer - pr.nodeCountServer,
-                 documentLength: control.documentLength - pr.documentLength,
+                 psiScore: pr.psiScore - control.psiScore,
+                 nodeCountServer: pr.nodeCountServer - control.nodeCountServer,
+                 documentLength: pr.documentLength - control.documentLength,
                  psiPageStats: computeDelta(control.psiPageStats, pr.psiPageStats)};
 
     let metricsTable = [['Metric', 'Control', 'PR', 'Delta'],
