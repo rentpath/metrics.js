@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 
 const metrics = require('commander');
-const client = require('./lib/client_metrics');
-const psi = require('./lib/psi');
+const clientCollector = require('./lib/clientMetrics');
+const serverCollector = require('./lib/serverMetrics');
+const bundleCollector = require('./lib/bundleMetrics');
 const table = require('markdown-table');
-const server = require('./lib/serverMetrics');
 
 metrics
     .version('1.7.0')
-    .option('-m, --mobile', 'Use mobile user agent')
-    .option('--psi', 'Run Page Speed Insights')
-    .option('--psi-key [psiKey]', 'Page Speed Insights API key')
+    .option('--chromiumPath [chromiumPath]', 'Chromium path for puppeteer')
+    .option('--ignoreHTTPSErrors', 'Ignore HTTPS errors with puppeteer when true')
     .option('--control [control]', 'Specify the URL to be used as the control to compare against')
     .option('--pr [pr]', 'Specify the URL to be used to compare the control to')
     .parse(process.argv);
@@ -19,108 +18,30 @@ if (!process.argv.slice(2).length) {
     metrics.outputHelp();
 }
 
-async function gatherMetrics(url) {
-    const options = {isMobile: metrics.mobile,
-                     key: metrics.psiKey};
-    const clientMetrics = await client.collect(url, options);
-    const pageMetrics = clientMetrics.page;
-    const serverMetrics = await server.collect(url, metrics.mobile);
+const tableHeader = [['Metric',
+                      'Desktop Control',
+                      'Desktop PR',
+                      'Desktop ∆',
+                      'Mobile Control',
+                      'Mobile PR',
+                      'Mobile ∆']];
 
-    const psiData = {};
-    const psiScore = {};
-    const psiPageStats = {};
+const metricsCollectors = [clientCollector, serverCollector, bundleCollector];
 
-    if (metrics.psi) {
-        psiData = await psi.collect(url, options);
+async function printMarkdownTable(controlUrl, prUrl, options) {
+    let formattedTables = metricsCollectors.map(async (collector) => {
+        const control = await collector.collect(controlUrl, options);
+        const pr = await collector.collect(prUrl, options);
 
-        psiScore = psiData.ruleGroups.SPEED.score;
-        psiPageStats = psiData.pageStats;
+        return collector.formatTable(control, pr);
+    });
 
-        for (let k in psiPageStats) {
-            psiPageStats[k] = parseInt(psiPageStats[k]);
-        }
-    }
+    formattedTables = await Promise.all(formattedTables);
 
-    return {
-        pageMetrics: pageMetrics,
-        psiScore: psiScore,
-        psiPageStats: psiPageStats,
-        nodeCountServer: serverMetrics.nodeCount,
-        documentLength: serverMetrics.length
-    };
+    console.log(table([].concat.apply(tableHeader, formattedTables)));
 }
 
-function computeDelta(control, pr) {
-    let delta = {};
-
-    for (let k in control) {
-        delta[k] = pr[k] - control[k];
-    }
-
-    return delta;
-}
-
-const greenSquare = '![#c5f015](https://placehold.it/15/c5f015/000000?text=+)'
-const yellowSquare = '[#fff66](https://placehold.it/15/fff66/000000?text=+)'
-const redSquare = '![#f03c15](https://placehold.it/15/f03c15/000000?text=+)'
-
-function prependColor(delta) {
-    if (delta == 0) {
-        return yellowSquare + ' ' + delta;
-    } else if (delta < 0) {
-        // Negative delta is positive result e.g. we made it faster or smaller
-        return greenSquare + ' ' + delta;
-    } else {
-        return redSquare + ' ' + delta;
-    }
-}
-
-async function doIt(controlUrl, prUrl) {
-    let control = await gatherMetrics(controlUrl);
-    let pr = await gatherMetrics(prUrl);
-
-    let delta = {pageMetrics: computeDelta(control.pageMetrics, pr.pageMetrics),
-                 psiScore: pr.psiScore - control.psiScore,
-                 nodeCountServer: pr.nodeCountServer - control.nodeCountServer,
-                 documentLength: pr.documentLength - control.documentLength,
-                 psiPageStats: computeDelta(control.psiPageStats, pr.psiPageStats)};
-
-    let metricsTable = [['Metric', 'Control', 'PR', 'Delta'],
-                        ['Client Side', '', '', ''],
-                        ['DOM Content Loaded (ms)', control.pageMetrics.dcl, pr.pageMetrics.dcl, prependColor(delta.pageMetrics.dcl)],
-                        ['Interactive (ms)', control.pageMetrics.interactive, pr.pageMetrics.interactive, prependColor(delta.pageMetrics.interactive)],
-                          ['DOM Complete (ms)', control.pageMetrics.domComplete, pr.pageMetrics.domComplete, prependColor(delta.pageMetrics.domComplete)],
-                          ['Load (ms)', control.pageMetrics.load, pr.pageMetrics.load, prependColor(delta.pageMetrics.load)],
-                          ['Paint (ms)', control.pageMetrics.paint, pr.pageMetrics.paint, prependColor(delta.pageMetrics.paint)],
-                          ['DOM Nodes', control.pageMetrics.nodeCount, pr.pageMetrics.nodeCount, prependColor(delta.pageMetrics.nodeCount)],
-                        ['Server Side', '', '', ''],
-                          ['DOM Nodes', control.nodeCountServer, pr.nodeCountServer, prependColor(delta.nodeCountServer)],
-                          ['Document Length (bytes)', control.documentLength, pr.documentLength, prependColor(delta.documentLength)]];
-
-    let psiMetricsTable;
-
-    if (metrics.psi) {
-        psiMetricsTable = [['Page Speed Insights', '', '', ''],
-                           ['PSI Score (0/100)', control.psiScore, pr.psiScore, prependColor(delta.psiScore)],
-                            ['Number of Hosts', control.psiPageStats.numberHosts, pr.psiPageStats.numberHosts, prependColor(delta.psiPageStats.numberHosts)],
-                            ['Number of Resources', control.psiPageStats.numberResources, pr.psiPageStats.numberResources, prependColor(delta.psiPageStats.numberResources)],
-                            ['Number of Static Resources', control.psiPageStats.numberStaticResources, pr.psiPageStats.numberStaticResources, prependColor(delta.psiPageStats.numberStaticResources)],
-                            ['Total Request Bytes', control.psiPageStats.totalRequestBytes, pr.psiPageStats.totalRequestBytes, prependColor(delta.psiPageStats.totalRequestBytes)],
-                            ['HTML Response Bytes', control.psiPageStats.htmlResponseBytes, pr.psiPageStats.htmlResponseBytes, prependColor(delta.psiPageStats.htmlResponseBytes)],
-                            ['CSS Response Bytes', control.psiPageStats.cssResponseBytes, pr.psiPageStats.cssResponseBytes, prependColor(delta.psiPageStats.cssResponseBytes)],
-                            ['JS Response Bytes', control.psiPageStats.javascriptResponseBytes, pr.psiPageStats.javascriptResponseBytes, prependColor(delta.psiPageStats.javascriptResponseBytes)],
-                            ['Image Response Bytes', control.psiPageStats.imageResponseBytes, pr.psiPageStats.imageResponseBytes, prependColor(delta.psiPageStats.imageResponseBytes)],
-                            ['Other Response Bytes', control.psiPageStats.otherResponseBytes, pr.psiPageStats.otherResponseBytes, prependColor(delta.psiPageStats.otherResponseBytes)],
-                            ['Number JS Resources', control.psiPageStats.numberJsResources, pr.psiPageStats.numberJsResources, prependColor(delta.psiPageStats.numberJsResources)],
-                            ['Number CSS Resources', control.psiPageStats.numberCssResources, pr.psiPageStats.numberCssResources, prependColor(delta.psiPageStats.numberCssResources)]]
-    }
-
-    let resultsTable = table([].concat.apply([], [metricsTable, psiMetricsTable]).filter(x => x));
-    const platform = metrics.mobile ? 'Mobile' : 'Desktop';
-
-    console.log('Results of ' + controlUrl + ' vs. ' + prUrl + ' on ' + platform);
-    console.log();
-    console.log(resultsTable);
-}
-
-doIt(metrics.control, metrics.pr);
+printMarkdownTable(metrics.control,
+                   metrics.pr,
+                   {executablePath: metrics.chromiumPath,
+                    ignoreHTTPSErrors: metrics.ignoreHTTPSErrors});
