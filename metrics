@@ -11,6 +11,8 @@ metrics
     .option('--chromiumPath [chromiumPath]', 'Chromium path for puppeteer')
     .option('--ignoreHTTPSErrors', 'Ignore HTTPS errors with puppeteer when true')
     .option('--control [control]', 'Specify the URL to be used as the control to compare against')
+    .option('--controlBundleMetricsUrl [controlBundleMetricsUrl]', 'Specify the URL to get to the bundle metrics for the control')
+    .option('--prBundleMetricsUrl [prBundleMetricsUrl]', 'Specify the URL to get to the bundle metrics for the pr')
     .option('--pr [pr]', 'Specify the URL to be used to compare the control to')
     .parse(process.argv);
 
@@ -30,8 +32,16 @@ const metricsCollectors = [clientCollector, serverCollector, bundleCollector];
 
 async function printMarkdownTable(controlUrl, prUrl, options) {
     let formattedTables = metricsCollectors.map(async (collector) => {
-        const control = await collector.collect(controlUrl, options);
-        const pr = await collector.collect(prUrl, options);
+        let control;
+        let pr;
+
+        if (collector === bundleCollector) {
+            control = await collector.collect(options['controlBundleMetricsUrl'], options);
+            pr = await collector.collect(options['prBundleMetricsUrl'], options)
+        } else {
+            control = await collector.collect(controlUrl, options);
+            pr = await collector.collect(prUrl, options);
+        }
 
         return collector.formatTable(control, pr);
     });
@@ -43,5 +53,7 @@ async function printMarkdownTable(controlUrl, prUrl, options) {
 
 printMarkdownTable(metrics.control,
                    metrics.pr,
-                   {executablePath: metrics.chromiumPath,
+                   {controlBundleMetricsUrl: metrics.controlBundleMetricsUrl,
+                    prBundleMetricsUrl: metrics.prBundleMetricsUrl,
+                    executablePath: metrics.chromiumPath,
                     ignoreHTTPSErrors: metrics.ignoreHTTPSErrors});
