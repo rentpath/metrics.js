@@ -28,11 +28,11 @@ const tableHeader = [['Metric',
                       'Mobile PR',
                       'Mobile ∆']];
 
-let metricsCollectors; 
+let metricsCollectors;
 if (metrics.prBundleMetricsUrl || metrics.controlBundleMetricsUrl) {
-    metricsCollectors = [clientCollector, serverCollector, bundleCollector];
+    metricsCollectors = [bundleCollector, serverCollector, clientCollector];
 } else {
-    metricsCollectors = [clientCollector, serverCollector];
+    metricsCollectors = [serverCollector, clientCollector];
 }
 
 async function printMarkdownTable(controlUrl, prUrl, options) {
