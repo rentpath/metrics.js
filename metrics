@@ -28,7 +28,12 @@ const tableHeader = [['Metric',
                       'Mobile PR',
                       'Mobile ∆']];
 
-const metricsCollectors = [clientCollector, serverCollector, bundleCollector];
+let metricsCollectors; 
+if (metrics.prBundleMetricsUrl || metrics.controlBundleMetricsUrl) {
+    metricsCollectors = [clientCollector, serverCollector, bundleCollector];
+} else {
+    metricsCollectors = [clientCollector, serverCollector];
+}
 
 async function printMarkdownTable(controlUrl, prUrl, options) {
     let formattedTables = metricsCollectors.map(async (collector) => {
