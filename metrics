@@ -7,7 +7,7 @@ const bundleCollector = require('./lib/bundleMetrics');
 const table = require('markdown-table');
 
 metrics
-    .version('1.7.0')
+    .version('2.6.1')
     .option('--chromiumPath [chromiumPath]', 'Chromium path for puppeteer')
     .option('--ignoreHTTPSErrors', 'Ignore HTTPS errors with puppeteer when true')
     .option('--control [control]', 'Specify the URL to be used as the control to compare against')
@@ -61,7 +61,6 @@ function averageSample(sample) {
             average[desktopOrMobile][field] /= sample.length;
         });
     });
-    console.dir(average)
 
     return average;
 }
