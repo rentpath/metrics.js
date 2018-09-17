@@ -14,6 +14,7 @@ metrics
     .option('--controlBundleMetricsUrl [controlBundleMetricsUrl]', 'Specify the URL to get to the bundle metrics for the control')
     .option('--prBundleMetricsUrl [prBundleMetricsUrl]', 'Specify the URL to get to the bundle metrics for the pr')
     .option('--pr [pr]', 'Specify the URL to be used to compare the control to')
+    .option('--sampleSize [sampleSize]', 'Number of times to run and average the metrics. Defaults to 1')
     .parse(process.argv);
 
 if (!process.argv.slice(2).length) {
@@ -21,12 +22,12 @@ if (!process.argv.slice(2).length) {
 }
 
 const tableHeader = [['Metric',
-                      'Desktop Control',
-                      'Desktop PR',
-                      'Desktop ∆',
-                      'Mobile Control',
-                      'Mobile PR',
-                      'Mobile ∆']];
+    'Desktop Control',
+    'Desktop PR',
+    'Desktop ∆',
+    'Mobile Control',
+    'Mobile PR',
+    'Mobile ∆']];
 
 let metricsCollectors;
 if (metrics.prBundleMetricsUrl || metrics.controlBundleMetricsUrl) {
@@ -35,18 +36,53 @@ if (metrics.prBundleMetricsUrl || metrics.controlBundleMetricsUrl) {
     metricsCollectors = [serverCollector, clientCollector];
 }
 
+function sumMetrics(total, metric) {
+    Object.keys(metric).map((field) => {
+        if (total[field]) {
+            total[field] += metric[field];
+        } else {
+            total[field] = metric[field];
+        }
+    });
+    return total;
+}
+
+function averageSample(sample) {
+    const total = sample.reduce(function (acc, metric) {
+        acc['desktop'] = sumMetrics(acc['desktop'], metric['desktop']);
+        acc['mobile'] = sumMetrics(acc['mobile'], metric['mobile']);
+        return acc;
+    });
+
+    let average = total;
+
+    ['desktop', 'mobile'].map((desktopOrMobile) => {
+        Object.keys(average[desktopOrMobile]).map((field) => {
+            average[desktopOrMobile][field] /= sample.length;
+        });
+    });
+    console.dir(average)
+
+    return average;
+}
+
 async function printMarkdownTable(controlUrl, prUrl, options) {
     let formattedTables = metricsCollectors.map(async (collector) => {
-        let control;
-        let pr;
+        let controlSample = [];
+        let prSample = [];
 
-        if (collector === bundleCollector) {
-            control = await collector.collect(options['controlBundleMetricsUrl'], options);
-            pr = await collector.collect(options['prBundleMetricsUrl'], options)
-        } else {
-            control = await collector.collect(controlUrl, options);
-            pr = await collector.collect(prUrl, options);
+        for (let i = 0; i < options.sampleSize; i++) {
+            if (collector === bundleCollector) {
+                controlSample.push(await collector.collect(options['controlBundleMetricsUrl'], options));
+                prSample.push(await collector.collect(options['prBundleMetricsUrl'], options));
+            } else {
+                controlSample.push(await collector.collect(controlUrl, options));
+                prSample.push(await collector.collect(prUrl, options));
+            }
         }
+
+        const control = averageSample(controlSample);
+        const pr = averageSample(prSample);
 
         return collector.formatTable(control, pr);
     });
@@ -57,8 +93,11 @@ async function printMarkdownTable(controlUrl, prUrl, options) {
 }
 
 printMarkdownTable(metrics.control,
-                   metrics.pr,
-                   {controlBundleMetricsUrl: metrics.controlBundleMetricsUrl,
-                    prBundleMetricsUrl: metrics.prBundleMetricsUrl,
-                    executablePath: metrics.chromiumPath,
-                    ignoreHTTPSErrors: metrics.ignoreHTTPSErrors});
+    metrics.pr,
+    {
+        controlBundleMetricsUrl: metrics.controlBundleMetricsUrl,
+        prBundleMetricsUrl: metrics.prBundleMetricsUrl,
+        executablePath: metrics.chromiumPath,
+        ignoreHTTPSErrors: metrics.ignoreHTTPSErrors,
+        sampleSize: metrics.sampleSize || 1
+    });
